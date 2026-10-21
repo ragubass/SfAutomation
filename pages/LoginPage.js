@@ -10,8 +10,8 @@ export class LoginPage {
     this.signInButton = page.getByRole('button', { name: /^sign in$/i });
   }
 
-  async open() {
-    await this.page.goto(appUrls.login);
+  async open(url = appUrls.login) {
+    await this.page.goto(url);
   }
 
   async expectLoaded() {
