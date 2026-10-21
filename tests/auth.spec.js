@@ -32,37 +32,38 @@ test.describe('SleekFlow authentication flow checks', () => {
   });
 
   test('signup submission reaches the verification step', async ({ page }) => {
-    const homePage = new HomePage(page);
     const signupPage = new SignupPage(page);
+    let submissionCount = 0;
 
-    await homePage.open();
-    await homePage.startFreeTrial();
-    await signupPage.expectLoaded();
-
-    await page.route('https://sso.sleekflow.io/**', async route => {
+    await page.route(url => {
+      const parsedUrl = new URL(url);
+      return parsedUrl.hostname === 'sso.sleekflow.io' && parsedUrl.pathname === '/u/signup/identifier';
+    }, async route => {
       const request = route.request();
-      const requestUrl = new URL(request.url());
 
       if (request.method() === 'POST') {
-        if (requestUrl.pathname.endsWith('/u/signup/identifier')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'text/html',
-            body: '<!doctype html><html><body><main><h1>Check your email</h1></main></body></html>'
-          });
-          return;
-        }
-
-        await route.abort();
+        submissionCount += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: '<!doctype html><html><body><main><h1>Check your email</h1></main></body></html>'
+        });
         return;
       }
 
-      await route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><html><body><main><h1>Create your account</h1><form method="post" action="https://sso.sleekflow.io/u/signup/identifier?state=mock"><label for="email">Email address</label><input id="email" name="username" type="email" required><input id="terms-of-service" name="terms" type="checkbox"><label for="terms-of-service">By checking this box, I agree to the Terms of Service and Privacy Policy.</label><button type="submit">Sign up</button></form></main></body></html>'
+      });
     });
 
+    await page.goto('https://sso.sleekflow.io/u/signup/identifier?state=mock');
+    await signupPage.expectLoaded();
     await signupPage.completeRequiredFields(authTestData.signupEmail);
     await signupPage.submit();
     await signupPage.expectVerificationStep();
+    expect(submissionCount).toBe(1);
   });
 
   test('login rejects an email that does not belong to an account', async ({ page }) => {
